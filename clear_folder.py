@@ -5,6 +5,7 @@ import tkinter
 from tkinter import filedialog
 from datetime import datetime, timedelta
 import webbrowser
+from config import glob_locations
 
 
 class OutputColors:
@@ -38,18 +39,25 @@ def get_upcoming_friday():
 move_locations = {
     "Action Folder": r"C:\Users\codym\OneDrive\Action Folder",
     "Reeds UMC Action Folder": r"C:\Users\codym\OneDrive\Reeds UMC\Reeds Action Folder",
-    "Payroll": r"C:\Users\codym\Dropbox\Data Storage\My Documents\Apartments\Koontz & Goforth\HR\Payroll\2024"
+    "Payroll": r"C:\Users\codym\Dropbox\Data Storage\My Documents\Apartments\Koontz & Goforth\HR\Payroll\2024",
+    "previous": ""
 }
 
 
 # Get All files in directory
-def get_files():
-    location_input = input('Would you like to clear:\n1 - Downloads\n2 - ScanSnap Inbox\n9 - Other\n')
+def get_files(default_locations=glob_locations):
+    input_string = "What folder would you like to clear:\n"
+    for index, key in enumerate(default_locations):
+        if default_locations[key][0] != "":
+            input_string = input_string + f"{index + 1} - {default_locations[key][0]}" + "\n"
+    # input_string += input_string + "9 - Other\n"
+    location_input = input(input_string)
+
     match location_input.lower():
         case '1':
-            return glob(r"C:\Users\codym\Downloads\*")
+            return glob(glob_locations["location_1"][1])
         case '2':
-            return glob(r"C:\Users\codym\Dropbox\Data Storage\ScanSnap Inbox\*")
+            return glob(glob_locations["location_2"][1])
         case "9":
             tkinter.Tk().withdraw()  # prevents an empty tkinter window from appearing
             folder_path = filedialog.askdirectory()
@@ -62,6 +70,7 @@ def move_file(file_path, file_name):
                             "1 - Action folder\n"
                             "2 - Reeds UMC Action\n"
                             "3 - Payroll - current week\n"
+                            "8 - Previously Selected Location\n"
                             "9 - Select location\n")
 
     match location_choice:
@@ -81,9 +90,14 @@ def move_file(file_path, file_name):
             payroll_path = Path(payroll_folder_path, file_name)
             os.rename(file_path, payroll_path)
             print(f"Payroll for {friday}")
+        case '8':
+            new_path = move_locations['previous'] + "\\" + file_name
+            os.rename(file_path, new_path)
+            print("File moved to Action Folder")
         case '9':
             tkinter.Tk().withdraw()  # prevents an empty tkinter window from appearing
             folder_path = filedialog.askdirectory()
+            move_locations['previous'] = folder_path
             new_path = folder_path + "\\" + file_name
             os.rename(file_path, new_path)
             print("new folder path " + folder_path)
@@ -91,16 +105,13 @@ def move_file(file_path, file_name):
     print(f"{file_name} File Moved")
 
 
-def rename_file(file_path, file_name):
-    new_name = input(f"What would you like to rename {file_name}: ")
-    new_path = file_path.replace(file_name, new_name)
+def rename_file(file_path, file_name_to_change):
+    new_name = input(f"What would you like to rename {file_name_to_change}: ")
+    new_path = file_path.replace(file_name_to_change, new_name)
     # print(new_path)
     os.rename(file_path, new_path)
     print(f"{new_path} was renamed")
-    file_name = Path(new_path).name
-    next_step = input("Would you like to move the file: [y]es or [n]o: ")
-    if next_step.lower() == "y":
-        move_file(new_path, file_name)
+    return new_path
 
 
 def delete_file(file_path):
@@ -113,38 +124,39 @@ def delete_file(file_path):
         print(f"Error: {file_path} - {e.strerror}")
 
 
-def preview_file(file):
-    webbrowser.open('file://' + file)
-    action = input(f"\nWhat would you like to do with {file_name}: [m]ove, [r]ename, [d]elete, [s]kip or [q]uit ")
-    match action.lower():
-        case 'm':
-            move_file(file, file_name)
-        case "r":
-            rename_file(file, base)
-        case 'd':
-            delete_file(file)
+def preview_file(file_path):
+    webbrowser.open('file://' + file_path)
 
 
 if __name__ == "__main__":
+    exit_app = False
     files = get_files()
     for file in files:
-        base = Path(file).stem
-        file_name = Path(file).name
-        action = input(
-            f"\nWhat would you like to do with {OutputColors.WARNING}{file_name}{OutputColors.ENDC}\n"
-            "[m]ove, [r]ename, [d]elete, [s]kip or [q]uit ")
-        match action.lower():
-            case 'm':
-                move_file(file, file_name)
-            case "r":
-                rename_file(file, base)
-            case 'd':
-                delete_file(file)
-            case 'p':
-                preview_file(file)
-            case 's':
-                continue
-            case 'q':
-                break
+        while True:
+            file_name_with_ext = Path(file).stem
+            file_name_no_ext = Path(file).name
+            action = input(
+                f"\nWhat would you like to do with {OutputColors.WARNING}{file_name_no_ext}{OutputColors.ENDC}\n"
+                "[m]ove, [r]ename, [d]elete, [s]kip, [p]review, or [q]uit ")
+            match action.lower():
+                case 'm':
+                    move_file(file, file_name_no_ext)
+                    break
+                case "r":
+                    file = rename_file(file, file_name_with_ext)
+                    continue
+                case 'd':
+                    delete_file(file)
+                    break
+                case 'p':
+                    preview_file(file)
+                    continue
+                case 's':
+                    break
+                case 'q':
+                    exit_app = True
+                    break
+        if exit_app:
+            break
 
     print('Download folder empty!!')
